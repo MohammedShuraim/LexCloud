@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-label="LexCloud  AI Legal Advisor for Indian Law">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#070c0a"/>
+      <stop offset="55%" stop-color="#0b1210"/>
+      <stop offset="100%" stop-color="#14201c"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="18%" cy="28%" r="48%">
+      <stop offset="0%" stop-color="#d4af6a" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#d4af6a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="86%" cy="72%" r="44%">
+      <stop offset="0%" stop-color="#3c6e5a" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#3c6e5a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f3ead6"/>
+      <stop offset="100%" stop-color="#d4af6a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <rect width="1280" height="420" fill="url(#glowA)"/>
+  <rect width="1280" height="420" fill="url(#glowB)"/>
+  <g stroke="#d4af6a" stroke-opacity="0.08" stroke-width="1">
+    <path d="M0 70h1280M0 140h1280M0 210h1280M0 280h1280M0 350h1280"/>
+    <path d="M160 0v420M320 0v420M480 0v420M640 0v420M800 0v420M960 0v420M1120 0v420"/>
+  </g>
+  <g transform="translate(168 210)">
+    <rect x="-72" y="-72" width="144" height="144" rx="28" fill="#0b1210" stroke="#d4af6a" stroke-opacity="0.5" stroke-width="2"/>
+    <path d="M-40 18c0-16 11-27 24-27 6 0 11 2 15 6 3-9 11-14 21-14 13 0 21 9 21 21 6 2 10 7 10 14 0 8-7 15-16 15H-24c-9 0-16-7-16-15z" fill="#1d2d27" stroke="#d4af6a" stroke-width="2"/>
+    <path d="M-32 38v-40c14-3 22 3 22 14s-8 22-22 26z" fill="#f3ead6"/>
+    <path d="M32 38v-40c-14-3-22 3-22 14s8 22 22 26z" fill="#d4af6a"/>
+  </g>
+  <text x="290" y="178" font-family="Georgia, Times New Roman, serif" font-size="84" font-weight="700" fill="url(#title)">LexCloud</text>
+  <text x="294" y="226" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="22" fill="#d4af6a" letter-spacing="4">AI LEGAL ADVISOR FOR INDIAN LAW</text>
+  <text x="294" y="278" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#c5d0c8">Upload a brief. Ask in English or voice. Hear the answer read back.</text>
+</svg>
