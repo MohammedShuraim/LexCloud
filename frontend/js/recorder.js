@@ -1,6 +1,6 @@
 const LexCloudRecorder = (() => {
   const TARGET_RATE = 44100;
-  const MAX_MS = 45000;
+  const MAX_MS = 120000;
 
   let mediaRecorder = null;
   let chunks = [];
@@ -11,6 +11,8 @@ const LexCloudRecorder = (() => {
   let raf = 0;
   let startedAt = 0;
   let blob = null;
+  let maxTimer = 0;
+  let onAutoStop = null;
 
   function canvas() {
     return document.getElementById("wave");
@@ -38,9 +40,10 @@ const LexCloudRecorder = (() => {
     raf = requestAnimationFrame(draw);
   }
 
-  async function start() {
+  async function start(options = {}) {
     blob = null;
     chunks = [];
+    onAutoStop = options.onAutoStop || null;
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
@@ -65,22 +68,27 @@ const LexCloudRecorder = (() => {
     startedAt = Date.now();
     canvas().classList.remove("hidden");
     draw();
-    window.setTimeout(() => {
-      if (mediaRecorder && mediaRecorder.state === "recording") stop();
+    window.clearTimeout(maxTimer);
+    maxTimer = window.setTimeout(async () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        const file = await stop();
+        if (onAutoStop) onAutoStop(file);
+      }
     }, MAX_MS);
   }
 
   function stop() {
     return new Promise((resolve) => {
+      window.clearTimeout(maxTimer);
       if (!mediaRecorder) {
-        resolve(null);
+        resolve(blob);
         return;
       }
       mediaRecorder.onstop = () => {
         cancelAnimationFrame(raf);
-        stream.getTracks().forEach((track) => track.stop());
+        if (stream) stream.getTracks().forEach((track) => track.stop());
         blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
-        if (audioCtx) audioCtx.close();
+        if (audioCtx && audioCtx.state !== "closed") audioCtx.close();
         mediaRecorder = null;
         stream = null;
         resolve(blob);
@@ -91,6 +99,7 @@ const LexCloudRecorder = (() => {
   }
 
   function discard() {
+    window.clearTimeout(maxTimer);
     blob = null;
     chunks = [];
     canvas().classList.add("hidden");

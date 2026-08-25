@@ -11,7 +11,7 @@ const state = {
   documentReady: false,
   lastAnswer: "",
   recording: false,
-  reviewing: false,
+  transcribing: false,
   busy: false,
 };
 
@@ -29,6 +29,7 @@ function setDocStatus(kind, label) {
 function setBusy(busy) {
   state.busy = busy;
   $("askBtn").disabled = busy;
+  $("recordBtn").disabled = busy || state.transcribing;
 }
 
 function setMode(mode) {
@@ -41,26 +42,35 @@ function setMode(mode) {
   $("translatePanel").classList.toggle("hidden", mode !== "translate");
   $("queryPanel").classList.toggle("hidden", mode === "translate");
   $("askBtn").textContent = mode === "translate" ? "Translate document" : "Ask LexCloud";
+  $("translateProgress").classList.add("hidden");
 }
 
-function typeAnswer(text) {
+function showProgress(label) {
+  const el = $("translateProgress");
+  if (!label) {
+    el.classList.add("hidden");
+    el.textContent = "";
+    return;
+  }
+  el.textContent = label;
+  el.classList.remove("hidden");
+}
+
+function renderAnswer(text, options = {}) {
   const el = $("answer");
-  el.classList.remove("is-empty");
-  el.classList.add("caret");
-  el.textContent = "";
-  let i = 0;
-  const tick = () => {
-    i += Math.max(1, Math.round(text.length / 180));
-    el.textContent = text.slice(0, i);
-    if (i < text.length) {
-      requestAnimationFrame(tick);
-    } else {
-      el.classList.remove("caret");
-      state.lastAnswer = text;
-      $("listenBtn").disabled = !text;
-    }
-  };
-  tick();
+  const content = String(text || "");
+  el.classList.remove("is-empty", "caret");
+  el.classList.toggle("is-translation", Boolean(options.translation));
+  if (!content) {
+    el.classList.add("is-empty");
+    el.textContent = "The bench is clear. Upload a document or ask a question.";
+    state.lastAnswer = "";
+    $("listenBtn").disabled = true;
+    return;
+  }
+  el.innerHTML = options.translation ? formatPlainDocument(content) : formatAnswer(content);
+  state.lastAnswer = content;
+  $("listenBtn").disabled = !content;
 }
 
 function setProgress(pct) {
@@ -68,10 +78,11 @@ function setProgress(pct) {
 }
 
 function setRecordUi() {
-  $("recordBtn").textContent = state.recording ? "Stop" : state.reviewing ? "Re-record" : "Record";
+  if (state.transcribing) $("recordBtn").textContent = "Transcribing";
+  else if (state.recording) $("recordBtn").textContent = "Stop";
+  else $("recordBtn").textContent = "Record";
   $("recordBtn").classList.toggle("is-live", state.recording);
-  $("discardBtn").classList.toggle("hidden", !state.reviewing);
-  $("submitAudioBtn").classList.toggle("hidden", !state.reviewing);
+  $("recordBtn").disabled = state.busy || state.transcribing;
 }
 
 async function ingestPdf(file) {
@@ -87,59 +98,111 @@ async function ingestPdf(file) {
   setDocStatus("is-busy", "Extracting text");
   setProgress(100);
   await LexCloudApi.waitForDocument(meta.document_name, (info) => {
-    setDocStatus("is-busy", info.status === "PROCESSING" ? "Textract running" : info.status || "Waiting");
+    setDocStatus("is-busy", info.status === "PROCESSING" ? "Extracting text" : info.status || "Waiting");
   });
   state.documentReady = true;
   setDocStatus("is-ready", "Document ready");
+}
+
+async function translateDocument() {
+  let offset = 0;
+  const parts = [];
+  showProgress("Translating the full document…");
+  renderAnswer("Working through the document in order so nothing is dropped.", { translation: true });
+  while (true) {
+    const res = await LexCloudApi.query({
+      document_name: state.documentName,
+      query: "FETCH_FULL_TRANSLATION",
+      target_language: $("langSelect").value,
+      offset,
+    });
+    if (res.answer) parts.push(res.answer);
+    const total = Number(res.total) || 0;
+    const next = Number(res.next_offset) || offset;
+    if (total) {
+      const pct = Math.min(100, Math.round((next / total) * 100));
+      showProgress(`Translated ${next.toLocaleString()} of ${total.toLocaleString()} characters (${pct}%)`);
+    }
+    renderAnswer(parts.join("\n\n"), { translation: true });
+    if (res.done || next <= offset) break;
+    offset = next;
+  }
+  showProgress("Full document translated");
 }
 
 async function ask() {
   if (state.busy) return;
   try {
     setBusy(true);
+    showProgress("");
     if (state.mode === "chat") {
       const query = $("queryInput").value.trim();
       if (!query) {
-        typeAnswer("Type a legal question, or record one.");
+        renderAnswer("Type a legal question, or record one.");
         return;
       }
-      typeAnswer("Consulting the general desk…");
+      renderAnswer("Consulting the general desk…");
       const res = await LexCloudApi.query({
         document_name: "GENERAL_QUERY",
         query,
       });
-      typeAnswer(res.answer || "No answer returned.");
+      renderAnswer(res.answer || "No answer returned.");
       return;
     }
     if (!state.documentReady || !state.documentName) {
-      typeAnswer("Upload a PDF and wait until the document is ready.");
+      renderAnswer("Upload a PDF and wait until the document is ready.");
       return;
     }
     if (state.mode === "translate") {
-      typeAnswer("Translating the extracted text…");
-      const res = await LexCloudApi.query({
-        document_name: state.documentName,
-        query: "FETCH_FULL_TRANSLATION",
-        target_language: $("langSelect").value,
-      });
-      typeAnswer(res.answer || "No translation returned.");
+      await translateDocument();
       return;
     }
     const query = $("queryInput").value.trim();
     if (!query) {
-      typeAnswer("Ask a question about the uploaded document.");
+      renderAnswer("Ask a question about the uploaded document.");
       return;
     }
-    typeAnswer("Retrieving clauses and drafting an opinion…");
+    renderAnswer("Retrieving clauses and drafting an opinion…");
     const res = await LexCloudApi.query({
       document_name: state.documentName,
       query,
     });
-    typeAnswer(res.answer || "No answer returned.");
+    renderAnswer(res.answer || "No answer returned.");
   } catch (err) {
-    typeAnswer(err.message || String(err));
+    renderAnswer(err.message || String(err));
   } finally {
     setBusy(false);
+    setRecordUi();
+  }
+}
+
+async function transcribeBlob(blob) {
+  if (!blob || !blob.size) {
+    renderAnswer("No audio was captured. Press Record, speak, then press Stop.");
+    return;
+  }
+  state.transcribing = true;
+  setRecordUi();
+  try {
+    renderAnswer("Transcribing your recording…");
+    const res = await LexCloudApi.transcribe(blob);
+    const text = (res.transcription || "").trim();
+    $("queryInput").value = text;
+    if (!text) {
+      renderAnswer("Whisper returned empty text. Try a shorter, clearer clip.");
+      return;
+    }
+    if (state.mode === "translate") {
+      renderAnswer(`Heard: “${text}”\n\nChoose a language and press Translate document.`);
+    } else {
+      renderAnswer(`Heard: “${text}”\n\nPress Ask LexCloud to send this question.`);
+    }
+  } catch (err) {
+    renderAnswer(err.message || String(err));
+  } finally {
+    state.transcribing = false;
+    LexCloudRecorder.discard();
+    setRecordUi();
   }
 }
 
@@ -167,7 +230,7 @@ dropzone.addEventListener("drop", async (event) => {
     await ingestPdf(file);
   } catch (err) {
     setDocStatus("", "Upload failed");
-    typeAnswer(err.message);
+    renderAnswer(err.message);
   }
 });
 $("pdfInput").addEventListener("change", async (event) => {
@@ -177,7 +240,7 @@ $("pdfInput").addEventListener("change", async (event) => {
     await ingestPdf(file);
   } catch (err) {
     setDocStatus("", "Upload failed");
-    typeAnswer(err.message);
+    renderAnswer(err.message);
   }
 });
 
@@ -185,62 +248,46 @@ $("askBtn").addEventListener("click", ask);
 
 $("recordBtn").addEventListener("click", async () => {
   try {
+    if (state.transcribing) return;
     if (state.recording) {
-      await LexCloudRecorder.stop();
+      const blob = await LexCloudRecorder.stop();
       state.recording = false;
-      state.reviewing = true;
       setRecordUi();
+      await transcribeBlob(blob);
       return;
     }
-    await LexCloudRecorder.start();
+    await LexCloudRecorder.start({
+      onAutoStop: async (blob) => {
+        state.recording = false;
+        setRecordUi();
+        await transcribeBlob(blob);
+      },
+    });
     state.recording = true;
-    state.reviewing = false;
     setRecordUi();
   } catch (err) {
-    typeAnswer(`Microphone unavailable: ${err.message}`);
-  }
-});
-
-$("discardBtn").addEventListener("click", () => {
-  LexCloudRecorder.discard();
-  state.reviewing = false;
-  setRecordUi();
-});
-
-$("submitAudioBtn").addEventListener("click", async () => {
-  const blob = LexCloudRecorder.currentBlob();
-  if (!blob) return;
-  try {
-    typeAnswer("Transcribing with Whisper…");
-    const res = await LexCloudApi.transcribe(blob);
-    $("queryInput").value = res.transcription || "";
-    state.reviewing = false;
+    state.recording = false;
     setRecordUi();
-    if (!$("queryInput").value) {
-      typeAnswer("Whisper returned empty text. Try a shorter, clearer clip.");
-    } else {
-      typeAnswer("Transcription ready. Edit it if needed, then ask.");
-    }
-  } catch (err) {
-    typeAnswer(err.message);
+    renderAnswer(`Microphone unavailable: ${err.message}`);
   }
 });
 
 $("listenBtn").addEventListener("click", async () => {
   if (!state.lastAnswer) return;
   try {
-    const res = await LexCloudApi.speak(state.lastAnswer);
+    const spoken = plainForSpeech(state.lastAnswer).slice(0, 2800);
+    const res = await LexCloudApi.speak(spoken);
     const player = $("ttsPlayer");
     player.src = `data:audio/mpeg;base64,${res.audioBase64}`;
     player.classList.remove("hidden");
     await player.play();
   } catch (err) {
-    typeAnswer(err.message);
+    renderAnswer(err.message);
   }
 });
 
 setMode("rag");
 setRecordUi();
 if (!LexCloudApi.baseUrl() || LexCloudApi.baseUrl().includes("YOUR_API_ID")) {
-  typeAnswer("Frontend is ready. Deploy the API, then set apiBaseUrl in js/config.js (Amplify injects this in production).");
+  renderAnswer("Frontend is ready. Deploy the API, then set apiBaseUrl in js/config.js (Amplify injects this in production).");
 }

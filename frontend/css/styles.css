@@ -206,16 +206,69 @@ input {
 }
 
 .answer {
-  white-space: pre-wrap;
   color: var(--parchment);
   font-family: var(--serif);
-  font-size: 18px;
-  line-height: 1.65;
+  font-size: 17px;
+  line-height: 1.75;
   min-height: 4.5em;
 }
 
 .answer.is-empty {
   color: rgba(243, 234, 214, 0.38);
+  white-space: pre-wrap;
+}
+
+.answer h3,
+.answer h4 {
+  font-family: var(--serif);
+  color: var(--brass);
+  font-size: 1.15em;
+  font-weight: 600;
+  margin: 1.25em 0 0.45em;
+  letter-spacing: 0.01em;
+}
+
+.answer h3:first-child,
+.answer h4:first-child {
+  margin-top: 0;
+}
+
+.answer p {
+  margin: 0 0 0.85em;
+}
+
+.answer ul,
+.answer ol {
+  margin: 0 0 1em 1.2em;
+  padding: 0;
+}
+
+.answer li {
+  margin: 0.35em 0;
+}
+
+.answer strong {
+  color: #fff8e8;
+  font-weight: 600;
+}
+
+.answer hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2em 0;
+}
+
+.answer.is-translation {
+  font-size: 18px;
+  line-height: 1.9;
+}
+
+.translate-progress {
+  color: var(--mist);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
 }
 
 .wave {

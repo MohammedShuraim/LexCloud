@@ -29,9 +29,17 @@ LANGUAGE_CODE_MAP = {
 
 SYSTEM_PROMPT = (
     "You are a professional legal expert highly knowledgeable about Indian law. "
-    "Your responses must be clear, detailed, and structured. "
+    "Format every answer in Markdown: short headings, short paragraphs, and bullet lists. "
+    "Never return one unbroken wall of text. "
     "You are not a substitute for a licensed advocate."
 )
+
+TRANSLATE_SYSTEM = (
+    "You are a precise legal translator for Indian languages. "
+    "Return only the translation. Keep every sentence. Do not summarize."
+)
+
+CHUNK_CHARS = 1800
 
 
 def respond(status, body):
@@ -99,16 +107,16 @@ def build_rag_prompt(document_text, user_query):
     )
 
 
-def call_groq(user_content):
+def call_groq(user_content, max_tokens=1200, system=SYSTEM_PROMPT):
     if not GROQ_API_KEY or GROQ_API_KEY == "changeme":
         raise ValueError("GROQ_API_KEY is not configured")
     payload = {
         "model": GROQ_MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_content},
         ],
-        "max_tokens": 900,
+        "max_tokens": max_tokens,
     }
     request = urllib.request.Request(
         GROQ_API_URL,
@@ -121,7 +129,7 @@ def call_groq(user_content):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as resp:
+        with urllib.request.urlopen(request, timeout=25) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
@@ -130,43 +138,40 @@ def call_groq(user_content):
     return data["choices"][0]["message"]["content"]
 
 
-def groq_translate(text, target_lang):
-    language = LANGUAGE_CODE_MAP[target_lang]
-    pieces = []
-    remaining = text or ""
-    while remaining:
-        slice_text = remaining[:4000]
-        remaining = remaining[4000:]
-        prompt = (
-            f"Translate the following legal English text into {language}. "
-            "Preserve legal meaning, formality, and numbering. "
-            "Do not add commentary. Return only the translation.\n\n"
-            f"{slice_text}"
-        )
-        pieces.append(call_groq(prompt))
-    return "\n".join(pieces)
+def next_source_chunk(text, offset, size=CHUNK_CHARS):
+    if offset >= len(text):
+        return "", offset
+    end = min(offset + size, len(text))
+    if end < len(text):
+        window = text[offset:end]
+        break_at = max(window.rfind("\n\n"), window.rfind("\n"), window.rfind(". "))
+        if break_at > size * 0.4:
+            end = offset + break_at + 1
+    return text[offset:end], end
 
 
-def translate_content(text, target_lang):
+def translate_one(text, target_lang):
     try:
-        pieces = []
-        remaining = text or ""
-        while remaining:
-            slice_text = remaining[:9000]
-            remaining = remaining[9000:]
-            result = translate_client.translate_text(
-                Text=slice_text,
-                SourceLanguageCode="en",
-                TargetLanguageCode=target_lang,
-            )
-            pieces.append(result["TranslatedText"])
-        return "".join(pieces)
+        result = translate_client.translate_text(
+            Text=text[:9000],
+            SourceLanguageCode="en",
+            TargetLanguageCode=target_lang,
+        )
+        return result["TranslatedText"]
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code", "")
         print(f"Amazon Translate unavailable ({code}); falling back to Groq")
-        if code == "SubscriptionRequiredException":
-            return groq_translate(text, target_lang)
-        raise
+        if code != "SubscriptionRequiredException":
+            raise
+        language = LANGUAGE_CODE_MAP[target_lang]
+        prompt = (
+            f"Translate the following legal English text into {language}. "
+            "Preserve legal meaning, formality, numbering, and paragraph breaks. "
+            "Do not summarize or omit any sentence. "
+            "Do not add commentary. Return only the translation.\n\n"
+            f"{text}"
+        )
+        return call_groq(prompt, max_tokens=3500, system=TRANSLATE_SYSTEM)
 
 
 def lambda_handler(event, context):
@@ -204,13 +209,19 @@ def lambda_handler(event, context):
         if is_translation:
             if not target_lang_code or target_lang_code not in LANGUAGE_CODE_MAP:
                 return respond(400, {"error": "Invalid or missing target_language code."})
-            translated = translate_content(original_text, target_lang_code)
+            offset = max(0, int(body.get("offset") or 0))
+            chunk, next_offset = next_source_chunk(original_text, offset)
+            translated = translate_one(chunk, target_lang_code) if chunk else ""
             return respond(
                 200,
                 {
                     "answer": translated,
                     "mode": "translate",
                     "language": LANGUAGE_CODE_MAP[target_lang_code],
+                    "offset": offset,
+                    "next_offset": next_offset,
+                    "total": len(original_text),
+                    "done": next_offset >= len(original_text),
                 },
             )
 
