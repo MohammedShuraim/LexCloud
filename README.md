@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="LexCloud — AI Legal Advisor for Indian Law" width="100%">
+<img src="docs/logo.png" alt="LexCloud" width="180">
 
 # LexCloud
 
