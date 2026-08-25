@@ -72,6 +72,12 @@ Resources:
     Properties:
       Name: LexCloudApi
       StageName: prod
+      BinaryMediaTypes:
+        - multipart~1form-data
+        - audio~1webm
+        - audio~1wav
+        - audio~1mpeg
+        - application~1octet-stream
       Cors:
         AllowMethods: "'GET,POST,OPTIONS'"
         AllowHeaders: "'Content-Type'"
@@ -205,6 +211,26 @@ Resources:
           Properties:
             RestApiId: !Ref LexCloudApi
             Path: /tts
+            Method: POST
+
+  TranscriberFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LexCloudTranscriber
+      Handler: app.lambda_handler
+      CodeUri: lambdas/transcriber/
+      Timeout: 60
+      MemorySize: 512
+      Description: Groq Whisper speech-to-text
+      Environment:
+        Variables:
+          GROQ_API_KEY: !Ref GroqApiKey
+      Events:
+        TranscribeApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LexCloudApi
+            Path: /transcribe
             Method: POST
 
 Outputs:
