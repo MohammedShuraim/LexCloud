@@ -130,19 +130,43 @@ def call_groq(user_content):
     return data["choices"][0]["message"]["content"]
 
 
-def translate_content(text, target_lang):
+def groq_translate(text, target_lang):
+    language = LANGUAGE_CODE_MAP[target_lang]
     pieces = []
     remaining = text or ""
     while remaining:
-        slice_text = remaining[:9000]
-        remaining = remaining[9000:]
-        result = translate_client.translate_text(
-            Text=slice_text,
-            SourceLanguageCode="en",
-            TargetLanguageCode=target_lang,
+        slice_text = remaining[:4000]
+        remaining = remaining[4000:]
+        prompt = (
+            f"Translate the following legal English text into {language}. "
+            "Preserve legal meaning, formality, and numbering. "
+            "Do not add commentary. Return only the translation.\n\n"
+            f"{slice_text}"
         )
-        pieces.append(result["TranslatedText"])
-    return "".join(pieces)
+        pieces.append(call_groq(prompt))
+    return "\n".join(pieces)
+
+
+def translate_content(text, target_lang):
+    try:
+        pieces = []
+        remaining = text or ""
+        while remaining:
+            slice_text = remaining[:9000]
+            remaining = remaining[9000:]
+            result = translate_client.translate_text(
+                Text=slice_text,
+                SourceLanguageCode="en",
+                TargetLanguageCode=target_lang,
+            )
+            pieces.append(result["TranslatedText"])
+        return "".join(pieces)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        print(f"Amazon Translate unavailable ({code}); falling back to Groq")
+        if code == "SubscriptionRequiredException":
+            return groq_translate(text, target_lang)
+        raise
 
 
 def lambda_handler(event, context):
