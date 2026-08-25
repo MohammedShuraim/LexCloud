@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LexCloud — Indian Law Advisor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Outfit:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="wrap">
+      <header class="flex items-center justify-between gap-4 mb-10">
+        <div class="flex items-center gap-3">
+          <div class="brand-mark">Lx</div>
+          <div>
+            <p class="kicker mb-1">AWS serverless counsel</p>
+            <h1 class="text-2xl m-0 tracking-tight">LexCloud</h1>
+          </div>
+        </div>
+        <p class="text-sm text-[var(--mist)] max-w-xs text-right hidden sm:block">
+          Upload a brief, ask in English or voice, hear the answer read back.
+        </p>
+      </header>
+
+      <section class="mb-6">
+        <h2 class="text-4xl sm:text-5xl font-semibold leading-tight m-0 max-w-3xl">
+          Legal questions, grounded in the document you upload.
+        </h2>
+        <p class="mt-4 text-[var(--mist)] max-w-2xl">
+          Retrieval for contracts, on-demand translation into five Indian languages,
+          and a general desk for Indian law — with Whisper in and Polly out.
+        </p>
+      </section>
+
+      <nav class="mode-track" aria-label="Workspace modes">
+        <button class="mode-btn is-active" data-mode="rag" type="button">RAG</button>
+        <button class="mode-btn" data-mode="translate" type="button">Translate</button>
+        <button class="mode-btn" data-mode="chat" type="button">Chat</button>
+      </nav>
+
+      <main class="workspace">
+        <div class="progress" aria-hidden="true"><span id="uploadProgress"></span></div>
+        <div class="panel-pad space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p id="modeCopy" class="text-sm text-[var(--mist)] m-0">
+              Ask from an uploaded PDF. Answers stay inside the extracted text.
+            </p>
+            <span id="docStatus" class="status-pill">
+              <span class="dot"></span>
+              <span id="docStatusLabel">No document</span>
+            </span>
+          </div>
+
+          <div id="documentPanel">
+            <label class="dropzone" id="dropzone" for="pdfInput">
+              <span class="kicker">PDF</span>
+              <span id="dropLabel" class="serif text-lg">Drop a contract or statute, or browse</span>
+              <span class="text-xs text-[var(--mist)]">Stored privately in S3 via a presigned PUT</span>
+            </label>
+            <input id="pdfInput" class="hidden" type="file" accept="application/pdf" />
+          </div>
+
+          <div id="translatePanel" class="hidden">
+            <label class="kicker block mb-2" for="langSelect">Target language</label>
+            <select id="langSelect" class="lang-select px-3 py-2">
+              <option value="hi">Hindi</option>
+              <option value="ta">Tamil</option>
+              <option value="te">Telugu</option>
+              <option value="ml">Malayalam</option>
+              <option value="kn">Kannada</option>
+            </select>
+          </div>
+
+          <div id="queryPanel">
+            <label class="kicker block mb-2" for="queryInput">Question</label>
+            <textarea
+              id="queryInput"
+              class="query-box"
+              placeholder="What is the lease period, and who are the parties?"
+            ></textarea>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="askBtn" class="primary-btn" type="button">Ask LexCloud</button>
+            <button id="recordBtn" class="icon-btn" type="button">Record</button>
+            <button id="discardBtn" class="ghost-btn hidden" type="button">Discard</button>
+            <button id="submitAudioBtn" class="ghost-btn hidden" type="button">Use recording</button>
+            <button id="listenBtn" class="ghost-btn" type="button" disabled>Listen</button>
+          </div>
+
+          <canvas id="wave" class="wave hidden" width="960" height="112"></canvas>
+          <audio id="ttsPlayer" class="hidden" controls></audio>
+
+          <section>
+            <p class="kicker mb-3">Opinion</p>
+            <div id="answer" class="answer is-empty">The bench is clear. Upload a document or ask a question.</div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <script src="js/app.js"></script>
+  </body>
+</html>
