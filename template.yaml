@@ -156,6 +156,35 @@ Resources:
             Path: /document
             Method: GET
 
+  AiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LexCloudAi
+      Handler: app.lambda_handler
+      CodeUri: lambdas/ai/
+      Timeout: 60
+      MemorySize: 512
+      Description: RAG, general legal chat, and Amazon Translate
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DocumentsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - translate:TranslateText
+              Resource: "*"
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DocumentsTable
+          GROQ_API_KEY: !Ref GroqApiKey
+      Events:
+        QueryApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LexCloudApi
+            Path: /query
+            Method: POST
+
 Outputs:
   UploadsBucketName:
     Description: S3 bucket for presigned PDF uploads
