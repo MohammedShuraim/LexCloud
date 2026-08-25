@@ -1,6 +1,6 @@
 <!-- Upper section: hero -->
 <div align="center">
-<img src="docs/banner.jpg" alt="LexCloud — Indian Law Advisor" width="100%">
+<img src="docs/banner.gif" alt="LexCloud — AI legal advisor for Indian law" width="100%">
 </div>
 
 ---
@@ -151,11 +151,14 @@ pypdf and Groq cover extract and translate when Textract or Amazon Translate are
 
 | Surface | Preview |
 |---|---|
+| **Hero / counsel board** | ![LexCloud counsel board](docs/banner.gif) |
 | **Live Amplify desk** | ![Live Amplify desk](docs/screenshots/amplify.jpg) |
 | **RAG** | ![RAG](docs/screenshots/rag.jpg) |
 | **Translate** | ![Translate](docs/screenshots/translate.jpg) |
 | **Chat** | ![Chat](docs/screenshots/chat.jpg) |
 | **Voice recorder** | ![Voice recorder](docs/screenshots/recorder.jpg) |
+
+The hero is an animated **GIF** of Lady Justice as a LexCloud session board: RAG / Translate / Chat cycling, PDF → extract → RAG → Polly, Whisper waveform, and Indian-language glyphs. GitHub plays GIFs in the README (animated SVG is often blocked).
 
 Open the [live app](https://main.d2pw2pic3w5m1.amplifyapp.com) to click through the same surfaces.
 
@@ -313,11 +316,13 @@ LexCloud/
 │   ├── tts/                   # Polly Aditi
 │   └── transcriber/           # Groq Whisper
 ├── docs/
-│   ├── banner.jpg             # Lady Justice README hero
+│   ├── banner.gif             # Animated Lady Justice / LexCloud board
+│   ├── banner.jpg             # Static still of the same hero
 │   ├── logo.png               # Brand mark
 │   └── screenshots/           # Product captures for this README
 ├── scripts/
-│   └── capture_readme_shots.py
+│   ├── capture_readme_shots.py
+│   └── make_banner_gif.py
 ├── template.yaml              # SAM / CloudFormation
 ├── amplify.yml
 ├── LICENSE
