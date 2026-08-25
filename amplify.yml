@@ -1,0 +1,12 @@
+version: 1
+frontend:
+  phases:
+    build:
+      commands:
+        - echo "LexCloud static frontend (API URL injected in a later commit)"
+  artifacts:
+    baseDirectory: frontend
+    files:
+      - '**/*'
+  cache:
+    paths: []

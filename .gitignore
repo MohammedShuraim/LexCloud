@@ -1,0 +1,26 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+frontend/js/config.js
+
+# AWS packaging
+.aws-sam/
+packaged.yaml
+packaged-template.yaml
+samconfig.toml
+*.zip
+lambda-artifacts/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
