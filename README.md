@@ -17,6 +17,7 @@ A serverless counsel that **uploads legal PDFs**, **answers from the document (R
 [![Groq](https://img.shields.io/badge/Groq-GPT--OSS%20%2B%20Whisper-f55036?style=for-the-badge)](https://groq.com/)
 [![Polly](https://img.shields.io/badge/Polly-Aditi-4B72B0?style=for-the-badge)](https://aws.amazon.com/polly/)
 [![License](https://img.shields.io/badge/License-MIT-7c6cff?style=for-the-badge)](LICENSE)
+[![Watch demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20demo-Loom-625df5?style=for-the-badge&logo=loom&logoColor=white)](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a)
 
 **Theme** · Ink (`#0b1210`) · Brass (`#d4af6a`) · Parchment (`#f3ead6`) · Editorial legal UI
 
@@ -25,6 +26,24 @@ A serverless counsel that **uploads legal PDFs**, **answers from the document (R
 **API** · `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod`
 
 **Built by [Mohammed Rashique Shuraim](https://github.com/MohammedShuraim)**
+
+</div>
+
+---
+
+<div align="center">
+
+## See it with your own eyes
+
+<a href="https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a">
+  <img src="https://cdn.loom.com/sessions/thumbnails/ed575fdabd3142d5bef7168b4414385a-with-play.gif" alt="Watch the LexCloud product demo on Loom" width="720">
+</a>
+
+### [▶ Watch the LexCloud demo on Loom](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a)
+
+Upload a legal PDF · Ask with RAG · Translate the full document · Record a question · Hear Polly read the answer
+
+GitHub cannot play video inside a README. Click the preview — it opens the recording so anyone can watch it without requesting access.
 
 </div>
 
@@ -162,6 +181,7 @@ flowchart TD
 
 | Surface | URL |
 |---|---|
+| **Product video** | [Watch on Loom](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a) |
 | Web app | [https://main.d2pw2pic3w5m1.amplifyapp.com](https://main.d2pw2pic3w5m1.amplifyapp.com) |
 | API base | `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod` |
 | GitHub | [MohammedShuraim/LexCloud](https://github.com/MohammedShuraim/LexCloud) |
