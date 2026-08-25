@@ -32,7 +32,7 @@ A serverless counsel that **uploads legal PDFs**, **answers from the document (R
 
 ## Project Overview
 
-**LexCloud** is a cloud-native legal desk for Indian contracts and statutes. RAG, Translate, and Chat are **independent modes** — a PDF uploaded in RAG is not reused in Translate, and Chat never reads a document.
+**LexCloud** is a cloud-native legal desk for Indian contracts and statutes. Upload a PDF once, then **ask (RAG)** or **translate** it. **Chat** never reads a document.
 
 | Capability | What it does |
 |---|---|
@@ -115,7 +115,7 @@ flowchart TD
 
 | Feature | Status |
 |---|---|
-| Independent RAG / Translate uploads | Implemented |
+| One PDF shared by RAG and Translate | Implemented |
 | Chat never reads a PDF | Implemented |
 | Per-mode document status pill | Implemented |
 | Markdown tables, headings, bullets | Implemented |

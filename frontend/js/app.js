@@ -1,20 +1,17 @@
 const MODE_COPY = {
-  rag: "Ask from an uploaded PDF. This file is used only in RAG.",
-  translate: "Translate a PDF into a major Indian language. Upload here is separate from RAG.",
+  rag: "Ask questions from the uploaded PDF. The same file is used for Translate.",
+  translate: "Translate the uploaded PDF. Use the same file you uploaded in RAG, or drop a new one here.",
   chat: "General Indian-law questions. Chat never reads a PDF.",
 };
 
 const DROP_HINT = {
-  rag: "This file is used only for RAG questions.",
-  translate: "This file is used only for translation.",
+  rag: "This PDF is used for RAG questions and for translation.",
+  translate: "This PDF is used for translation. RAG can use the same file.",
 };
 
 const state = {
   mode: "rag",
-  docs: {
-    rag: emptyDoc(),
-    translate: emptyDoc(),
-  },
+  doc: emptyDoc(),
   lastAnswer: "",
   recording: false,
   transcribing: false,
@@ -32,7 +29,7 @@ function $(id) {
 
 function activeDoc() {
   if (state.mode === "chat") return null;
-  return state.docs[state.mode];
+  return state.doc;
 }
 
 function setDocStatus(kind, label) {
@@ -48,7 +45,7 @@ function paintDocStatus() {
     return;
   }
   const doc = activeDoc();
-  if (doc.ready) setDocStatus("is-ready", `${state.mode === "rag" ? "RAG" : "Translate"} ready`);
+  if (doc.ready) setDocStatus("is-ready", "Document ready");
   else if (doc.documentName) setDocStatus("is-busy", "Extracting text");
   else setDocStatus("", "No document");
 }
@@ -134,8 +131,7 @@ function setRecordUi() {
 
 async function ingestPdf(file) {
   if (state.mode === "chat") return;
-  const slot = state.mode;
-  const doc = state.docs[slot];
+  const doc = state.doc;
   doc.file = file;
   doc.ready = false;
   doc.documentName = null;
@@ -148,16 +144,16 @@ async function ingestPdf(file) {
   setDocStatus("is-busy", "Extracting text");
   setProgress(100);
   await LexCloudApi.waitForDocument(meta.document_name, (info) => {
-    if (state.mode === slot) {
+    if (state.mode !== "chat") {
       setDocStatus("is-busy", info.status === "PROCESSING" ? "Extracting text" : info.status || "Waiting");
     }
   });
   doc.ready = true;
-  if (state.mode === slot) paintDocStatus();
+  if (state.mode !== "chat") paintDocStatus();
 }
 
 async function translateDocument() {
-  const doc = state.docs.translate;
+  const doc = state.doc;
   let offset = 0;
   const parts = [];
   showProgress("Translating the full document…");
@@ -204,12 +200,7 @@ async function ask() {
     }
     const doc = activeDoc();
     if (!doc || !doc.ready || !doc.documentName) {
-      await renderAnswer(
-        state.mode === "translate"
-          ? "Upload a PDF in Translate. RAG uploads are not reused here."
-          : "Upload a PDF in RAG. Translate uploads are not reused here.",
-        { instant: true }
-      );
+      await renderAnswer("Upload a PDF first, then ask or translate. Chat does not need a file.", { instant: true });
       return;
     }
     if (state.mode === "translate") {
@@ -218,7 +209,7 @@ async function ask() {
     }
     const query = $("queryInput").value.trim();
     if (!query) {
-      await renderAnswer("Ask a question about the RAG document.", { instant: true });
+      await renderAnswer("Ask a question about the uploaded document.", { instant: true });
       return;
     }
     await renderAnswer("Retrieving clauses and drafting an opinion…", { instant: true });
