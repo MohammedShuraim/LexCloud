@@ -185,6 +185,28 @@ Resources:
             Path: /query
             Method: POST
 
+  TtsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LexCloudTts
+      Handler: app.lambda_handler
+      CodeUri: lambdas/tts/
+      Timeout: 30
+      Description: Amazon Polly Aditi speech synthesis
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: "*"
+      Events:
+        TtsApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LexCloudApi
+            Path: /tts
+            Method: POST
+
 Outputs:
   UploadsBucketName:
     Description: S3 bucket for presigned PDF uploads
