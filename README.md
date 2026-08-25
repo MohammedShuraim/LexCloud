@@ -42,4 +42,6 @@ Amplify Hosting builds `frontend/` and writes `js/config.js` from `LEXCLOUD_API_
 
 Current API base URL: `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod`
 
+Live app: [https://main.d2pw2pic3w5m1.amplifyapp.com](https://main.d2pw2pic3w5m1.amplifyapp.com)
+
 If Amazon Textract or Amazon Translate are not subscribed on the account, the processor falls back to pypdf and Groq translation so the demo still runs. Enable those services in the AWS console to use the native APIs.
