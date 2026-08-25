@@ -6,13 +6,23 @@ const MODE_COPY = {
 
 const state = {
   mode: "rag",
+  file: null,
   documentName: null,
   documentReady: false,
   lastAnswer: "",
+  recording: false,
+  reviewing: false,
 };
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function setDocStatus(kind, label) {
+  const pill = $("docStatus");
+  pill.classList.remove("is-ready", "is-busy");
+  if (kind) pill.classList.add(kind);
+  $("docStatusLabel").textContent = label;
 }
 
 function setMode(mode) {
@@ -47,8 +57,59 @@ function typeAnswer(text) {
   tick();
 }
 
+function setProgress(pct) {
+  $("uploadProgress").style.width = `${pct}%`;
+}
+
+function showFile(file) {
+  state.file = file;
+  state.documentName = file ? file.name : null;
+  state.documentReady = Boolean(file);
+  $("dropLabel").textContent = file ? file.name : "Drop a contract or statute, or browse";
+  if (file) {
+    setDocStatus("is-busy", "Selected locally");
+    setProgress(12);
+    window.setTimeout(() => {
+      setProgress(100);
+      setDocStatus("is-ready", "Ready to upload");
+    }, 400);
+  } else {
+    setDocStatus("", "No document");
+    setProgress(0);
+  }
+}
+
+function setRecordUi() {
+  $("recordBtn").textContent = state.recording ? "Stop" : state.reviewing ? "Re-record" : "Record";
+  $("recordBtn").classList.toggle("is-live", state.recording);
+  $("discardBtn").classList.toggle("hidden", !state.reviewing);
+  $("submitAudioBtn").classList.toggle("hidden", !state.reviewing);
+}
+
 document.querySelectorAll(".mode-btn").forEach((btn) => {
   btn.addEventListener("click", () => setMode(btn.dataset.mode));
+});
+
+const dropzone = $("dropzone");
+["dragenter", "dragover"].forEach((name) => {
+  dropzone.addEventListener(name, (event) => {
+    event.preventDefault();
+    dropzone.classList.add("is-drag");
+  });
+});
+["dragleave", "drop"].forEach((name) => {
+  dropzone.addEventListener(name, (event) => {
+    event.preventDefault();
+    dropzone.classList.remove("is-drag");
+  });
+});
+dropzone.addEventListener("drop", (event) => {
+  const file = event.dataTransfer.files && event.dataTransfer.files[0];
+  if (file && file.type === "application/pdf") showFile(file);
+});
+$("pdfInput").addEventListener("change", (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (file) showFile(file);
 });
 
 $("askBtn").addEventListener("click", () => {
@@ -59,4 +120,45 @@ $("askBtn").addEventListener("click", () => {
   typeAnswer(preview);
 });
 
+$("recordBtn").addEventListener("click", async () => {
+  try {
+    if (state.recording) {
+      await LexCloudRecorder.stop();
+      state.recording = false;
+      state.reviewing = true;
+      setRecordUi();
+      typeAnswer("Recording captured. Discard it or use it as your question once Whisper is connected.");
+      return;
+    }
+    await LexCloudRecorder.start();
+    state.recording = true;
+    state.reviewing = false;
+    setRecordUi();
+  } catch (err) {
+    typeAnswer(`Microphone unavailable: ${err.message}`);
+  }
+});
+
+$("discardBtn").addEventListener("click", () => {
+  LexCloudRecorder.discard();
+  state.reviewing = false;
+  setRecordUi();
+});
+
+$("submitAudioBtn").addEventListener("click", () => {
+  const blob = LexCloudRecorder.currentBlob();
+  if (!blob) return;
+  $("queryInput").value = "(voice clip ready — transcription will fill this after Whisper is wired)";
+  state.reviewing = false;
+  setRecordUi();
+});
+
+$("listenBtn").addEventListener("click", () => {
+  if (!state.lastAnswer) return;
+  const player = $("ttsPlayer");
+  player.classList.remove("hidden");
+  typeAnswer(`${state.lastAnswer}\n\n(Polly playback will attach here once TTS is connected.)`);
+});
+
 setMode("rag");
+setRecordUi();
