@@ -91,13 +91,11 @@ flowchart LR
 ```mermaid
 flowchart TD
   A[Open Amplify app] --> B{Mode}
-  B -->|RAG| C[Upload PDF for RAG only]
-  B -->|Translate| D[Upload PDF for Translate only]
+  B -->|RAG or Translate| C[Upload one PDF]
   B -->|Chat| E[Type or record a general question]
   C --> F[Wait until document ready]
-  D --> F
   F --> G{Action}
-  G -->|Ask| H[Groq RAG on that mode's file]
+  G -->|Ask| H[Groq RAG on the uploaded file]
   G -->|Translate| I[Chunked full-document translation]
   E --> J[Groq general legal chat]
   H --> K[Formatted response]
