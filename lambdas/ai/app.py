@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 
@@ -28,9 +29,10 @@ LANGUAGE_CODE_MAP = {
 }
 
 SYSTEM_PROMPT = (
-    "You are a professional legal expert highly knowledgeable about Indian law. "
-    "Format every answer in Markdown: short headings, short paragraphs, and bullet lists. "
-    "Never return one unbroken wall of text. "
+    "You are a professional legal expert on Indian law. "
+    "Write like ChatGPT or Claude: clear section headings, short paragraphs, "
+    "bullet lists, and Markdown pipe tables whenever you compare laws or fields. "
+    "Put a blank line between sections. Never dump a wall of unformatted text. "
     "You are not a substitute for a licensed advocate."
 )
 
@@ -100,14 +102,17 @@ def build_rag_prompt(document_text, user_query):
         "provided document excerpt. If information is missing, say it is not in the document.\n\n"
         f"Document Excerpt:\n{document_text}\n\n"
         f"User's Detailed Question:\n{user_query}\n\n"
-        "Respond with this structure:\n"
-        "**1. Comprehensive Analysis:** multi-sentence answer with clause references when present.\n"
-        "**2. Legal Context & Rules:** Indian contract or statutory context.\n"
-        "**3. Suggested Next Steps:** practical compliance or counsel next steps."
+        "Respond in Markdown with:\n"
+        "## Comprehensive Analysis\n"
+        "short paragraphs and bullets\n"
+        "## Legal Context & Rules\n"
+        "use a pipe table if comparing statutes\n"
+        "## Suggested Next Steps\n"
+        "numbered actions."
     )
 
 
-def call_groq(user_content, max_tokens=1200, system=SYSTEM_PROMPT):
+def call_groq(user_content, max_tokens=1400, system=SYSTEM_PROMPT):
     if not GROQ_API_KEY or GROQ_API_KEY == "changeme":
         raise ValueError("GROQ_API_KEY is not configured")
     payload = {
@@ -118,24 +123,31 @@ def call_groq(user_content, max_tokens=1200, system=SYSTEM_PROMPT):
         ],
         "max_tokens": max_tokens,
     }
-    request = urllib.request.Request(
-        GROQ_API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json",
-            "User-Agent": "LexCloud/1.0",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=25) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        print("Groq HTTP error:", detail)
-        raise RuntimeError(f"Groq API {exc.code}") from exc
-    return data["choices"][0]["message"]["content"]
+    last_error = None
+    for attempt in range(4):
+        request = urllib.request.Request(
+            GROQ_API_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+                "User-Agent": "LexCloud/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=25) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            return data["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            print("Groq HTTP error:", exc.code, detail)
+            last_error = RuntimeError(f"Groq API {exc.code}")
+            if exc.code == 429 and attempt < 3:
+                time.sleep(1.2 * (2 ** attempt))
+                continue
+            raise last_error from exc
+    raise last_error
 
 
 def next_source_chunk(text, offset, size=CHUNK_CHARS):

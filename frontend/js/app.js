@@ -1,22 +1,38 @@
 const MODE_COPY = {
-  rag: "Ask from an uploaded PDF. Answers stay inside the extracted text.",
-  translate: "Translate the extracted document into a major Indian language.",
-  chat: "General Indian-law questions. No PDF or vector lookup.",
+  rag: "Ask from an uploaded PDF. This file is used only in RAG.",
+  translate: "Translate a PDF into a major Indian language. Upload here is separate from RAG.",
+  chat: "General Indian-law questions. Chat never reads a PDF.",
+};
+
+const DROP_HINT = {
+  rag: "This file is used only for RAG questions.",
+  translate: "This file is used only for translation.",
 };
 
 const state = {
   mode: "rag",
-  file: null,
-  documentName: null,
-  documentReady: false,
+  docs: {
+    rag: emptyDoc(),
+    translate: emptyDoc(),
+  },
   lastAnswer: "",
   recording: false,
   transcribing: false,
   busy: false,
+  revealToken: 0,
 };
+
+function emptyDoc() {
+  return { file: null, documentName: null, ready: false };
+}
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function activeDoc() {
+  if (state.mode === "chat") return null;
+  return state.docs[state.mode];
 }
 
 function setDocStatus(kind, label) {
@@ -24,6 +40,17 @@ function setDocStatus(kind, label) {
   pill.classList.remove("is-ready", "is-busy");
   if (kind) pill.classList.add(kind);
   $("docStatusLabel").textContent = label;
+}
+
+function paintDocStatus() {
+  if (state.mode === "chat") {
+    setDocStatus("", "Chat only");
+    return;
+  }
+  const doc = activeDoc();
+  if (doc.ready) setDocStatus("is-ready", `${state.mode === "rag" ? "RAG" : "Translate"} ready`);
+  else if (doc.documentName) setDocStatus("is-busy", "Extracting text");
+  else setDocStatus("", "No document");
 }
 
 function setBusy(busy) {
@@ -43,6 +70,11 @@ function setMode(mode) {
   $("queryPanel").classList.toggle("hidden", mode === "translate");
   $("askBtn").textContent = mode === "translate" ? "Translate document" : "Ask LexCloud";
   $("translateProgress").classList.add("hidden");
+  const doc = activeDoc();
+  if (doc && doc.file) $("dropLabel").textContent = doc.file.name;
+  else $("dropLabel").textContent = "Drop a contract or statute, or browse";
+  $("dropHint").textContent = DROP_HINT[mode] || "";
+  paintDocStatus();
 }
 
 function showProgress(label) {
@@ -56,9 +88,10 @@ function showProgress(label) {
   el.classList.remove("hidden");
 }
 
-function renderAnswer(text, options = {}) {
+async function renderAnswer(text, options = {}) {
   const el = $("answer");
   const content = String(text || "");
+  const token = ++state.revealToken;
   el.classList.remove("is-empty", "caret");
   el.classList.toggle("is-translation", Boolean(options.translation));
   if (!content) {
@@ -68,9 +101,23 @@ function renderAnswer(text, options = {}) {
     $("listenBtn").disabled = true;
     return;
   }
-  el.innerHTML = options.translation ? formatPlainDocument(content) : formatAnswer(content);
   state.lastAnswer = content;
   $("listenBtn").disabled = !content;
+  const html = options.translation ? formatPlainDocument(content) : formatAnswer(content);
+  if (options.instant || options.translation) {
+    el.innerHTML = html;
+    return;
+  }
+  const blocks = htmlToBlocks(html);
+  el.innerHTML = "";
+  for (const block of blocks) {
+    if (token !== state.revealToken) return;
+    const wrap = document.createElement("div");
+    wrap.className = "answer-block";
+    wrap.innerHTML = block;
+    el.appendChild(wrap);
+    await new Promise((resolve) => setTimeout(resolve, 70));
+  }
 }
 
 function setProgress(pct) {
@@ -86,32 +133,38 @@ function setRecordUi() {
 }
 
 async function ingestPdf(file) {
-  state.file = file;
-  state.documentReady = false;
-  state.documentName = null;
+  if (state.mode === "chat") return;
+  const slot = state.mode;
+  const doc = state.docs[slot];
+  doc.file = file;
+  doc.ready = false;
+  doc.documentName = null;
   $("dropLabel").textContent = file.name;
   setDocStatus("is-busy", "Uploading");
   setProgress(5);
   const meta = await LexCloudApi.requestUpload(file);
   await LexCloudApi.putFile(meta.uploadUrl, file, setProgress);
-  state.documentName = meta.document_name;
+  doc.documentName = meta.document_name;
   setDocStatus("is-busy", "Extracting text");
   setProgress(100);
   await LexCloudApi.waitForDocument(meta.document_name, (info) => {
-    setDocStatus("is-busy", info.status === "PROCESSING" ? "Extracting text" : info.status || "Waiting");
+    if (state.mode === slot) {
+      setDocStatus("is-busy", info.status === "PROCESSING" ? "Extracting text" : info.status || "Waiting");
+    }
   });
-  state.documentReady = true;
-  setDocStatus("is-ready", "Document ready");
+  doc.ready = true;
+  if (state.mode === slot) paintDocStatus();
 }
 
 async function translateDocument() {
+  const doc = state.docs.translate;
   let offset = 0;
   const parts = [];
   showProgress("Translating the full document…");
-  renderAnswer("Working through the document in order so nothing is dropped.", { translation: true });
+  await renderAnswer("Working through this Translate upload in order.", { translation: true, instant: true });
   while (true) {
     const res = await LexCloudApi.query({
-      document_name: state.documentName,
+      document_name: doc.documentName,
       query: "FETCH_FULL_TRANSLATION",
       target_language: $("langSelect").value,
       offset,
@@ -123,7 +176,7 @@ async function translateDocument() {
       const pct = Math.min(100, Math.round((next / total) * 100));
       showProgress(`Translated ${next.toLocaleString()} of ${total.toLocaleString()} characters (${pct}%)`);
     }
-    renderAnswer(parts.join("\n\n"), { translation: true });
+    await renderAnswer(parts.join("\n\n"), { translation: true, instant: true });
     if (res.done || next <= offset) break;
     offset = next;
   }
@@ -138,19 +191,25 @@ async function ask() {
     if (state.mode === "chat") {
       const query = $("queryInput").value.trim();
       if (!query) {
-        renderAnswer("Type a legal question, or record one.");
+        await renderAnswer("Type a legal question, or record one.", { instant: true });
         return;
       }
-      renderAnswer("Consulting the general desk…");
+      await renderAnswer("Consulting the general desk…", { instant: true });
       const res = await LexCloudApi.query({
         document_name: "GENERAL_QUERY",
         query,
       });
-      renderAnswer(res.answer || "No answer returned.");
+      await renderAnswer(res.answer || "No answer returned.");
       return;
     }
-    if (!state.documentReady || !state.documentName) {
-      renderAnswer("Upload a PDF and wait until the document is ready.");
+    const doc = activeDoc();
+    if (!doc || !doc.ready || !doc.documentName) {
+      await renderAnswer(
+        state.mode === "translate"
+          ? "Upload a PDF in Translate. RAG uploads are not reused here."
+          : "Upload a PDF in RAG. Translate uploads are not reused here.",
+        { instant: true }
+      );
       return;
     }
     if (state.mode === "translate") {
@@ -159,17 +218,17 @@ async function ask() {
     }
     const query = $("queryInput").value.trim();
     if (!query) {
-      renderAnswer("Ask a question about the uploaded document.");
+      await renderAnswer("Ask a question about the RAG document.", { instant: true });
       return;
     }
-    renderAnswer("Retrieving clauses and drafting an opinion…");
+    await renderAnswer("Retrieving clauses and drafting an opinion…", { instant: true });
     const res = await LexCloudApi.query({
-      document_name: state.documentName,
+      document_name: doc.documentName,
       query,
     });
-    renderAnswer(res.answer || "No answer returned.");
+    await renderAnswer(res.answer || "No answer returned.");
   } catch (err) {
-    renderAnswer(err.message || String(err));
+    await renderAnswer(friendlyError(err), { instant: true });
   } finally {
     setBusy(false);
     setRecordUi();
@@ -178,27 +237,27 @@ async function ask() {
 
 async function transcribeBlob(blob) {
   if (!blob || !blob.size) {
-    renderAnswer("No audio was captured. Press Record, speak, then press Stop.");
+    await renderAnswer("No audio was captured. Press Record, speak, then press Stop.", { instant: true });
     return;
   }
   state.transcribing = true;
   setRecordUi();
   try {
-    renderAnswer("Transcribing your recording…");
+    await renderAnswer("Transcribing your recording…", { instant: true });
     const res = await LexCloudApi.transcribe(blob);
     const text = (res.transcription || "").trim();
     $("queryInput").value = text;
     if (!text) {
-      renderAnswer("Whisper returned empty text. Try a shorter, clearer clip.");
+      await renderAnswer("Whisper returned empty text. Try a shorter, clearer clip.", { instant: true });
       return;
     }
     if (state.mode === "translate") {
-      renderAnswer(`Heard: “${text}”\n\nChoose a language and press Translate document.`);
+      await renderAnswer("Recording captured. Choose a language and press Translate document.", { instant: true });
     } else {
-      renderAnswer(`Heard: “${text}”\n\nPress Ask LexCloud to send this question.`);
+      await renderAnswer(`Heard: “${text}”\n\nPress Ask LexCloud to send this question.`, { instant: true });
     }
   } catch (err) {
-    renderAnswer(err.message || String(err));
+    await renderAnswer(friendlyError(err), { instant: true });
   } finally {
     state.transcribing = false;
     LexCloudRecorder.discard();
@@ -230,7 +289,7 @@ dropzone.addEventListener("drop", async (event) => {
     await ingestPdf(file);
   } catch (err) {
     setDocStatus("", "Upload failed");
-    renderAnswer(err.message);
+    await renderAnswer(friendlyError(err), { instant: true });
   }
 });
 $("pdfInput").addEventListener("change", async (event) => {
@@ -240,8 +299,9 @@ $("pdfInput").addEventListener("change", async (event) => {
     await ingestPdf(file);
   } catch (err) {
     setDocStatus("", "Upload failed");
-    renderAnswer(err.message);
+    await renderAnswer(friendlyError(err), { instant: true });
   }
+  event.target.value = "";
 });
 
 $("askBtn").addEventListener("click", ask);
@@ -268,7 +328,7 @@ $("recordBtn").addEventListener("click", async () => {
   } catch (err) {
     state.recording = false;
     setRecordUi();
-    renderAnswer(`Microphone unavailable: ${err.message}`);
+    await renderAnswer(`Microphone unavailable: ${err.message}`, { instant: true });
   }
 });
 
@@ -282,12 +342,12 @@ $("listenBtn").addEventListener("click", async () => {
     player.classList.remove("hidden");
     await player.play();
   } catch (err) {
-    renderAnswer(err.message);
+    await renderAnswer(friendlyError(err), { instant: true });
   }
 });
 
 setMode("rag");
 setRecordUi();
 if (!LexCloudApi.baseUrl() || LexCloudApi.baseUrl().includes("YOUR_API_ID")) {
-  renderAnswer("Frontend is ready. Deploy the API, then set apiBaseUrl in js/config.js (Amplify injects this in production).");
+  renderAnswer("Frontend is ready. Deploy the API, then set apiBaseUrl in js/config.js (Amplify injects this in production).", { instant: true });
 }

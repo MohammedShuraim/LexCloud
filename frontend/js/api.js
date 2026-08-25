@@ -80,12 +80,32 @@ const LexCloudApi = (() => {
 
   async function query(payload) {
     assertConfigured();
-    const res = await fetch(`${baseUrl()}/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    return parseJson(res);
+    let lastError = null;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const res = await fetch(`${baseUrl()}/query`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        data = { error: text || res.statusText };
+      }
+      const busy = res.status === 429 || /429/.test(JSON.stringify(data));
+      if (busy && attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+        lastError = new Error(data.error || "Groq API 429");
+        continue;
+      }
+      if (!res.ok) {
+        throw new Error(data.error || data.message || `Request failed (${res.status})`);
+      }
+      return data;
+    }
+    throw lastError || new Error("Groq API 429");
   }
 
   async function speak(text) {
