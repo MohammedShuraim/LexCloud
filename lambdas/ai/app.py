@@ -116,6 +116,7 @@ def call_groq(user_content):
         headers={
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json",
+            "User-Agent": "LexCloud/1.0",
         },
         method="POST",
     )

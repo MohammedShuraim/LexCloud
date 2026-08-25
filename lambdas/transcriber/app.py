@@ -110,6 +110,7 @@ def post_to_groq(file_bytes, filename, file_content_type, api_key):
         "Content-Type": f"multipart/form-data; boundary={boundary}",
         "Content-Length": str(len(body)),
         "Accept": "application/json",
+        "User-Agent": "LexCloud/1.0",
     }
     conn = HTTPSConnection(parsed.hostname, timeout=60)
     try:
