@@ -3,7 +3,12 @@ frontend:
   phases:
     build:
       commands:
-        - echo "LexCloud static frontend (API URL injected in a later commit)"
+        - |
+          if [ -z "${LEXCLOUD_API_BASE_URL}" ]; then
+            echo "LEXCLOUD_API_BASE_URL is required" >&2
+            exit 1
+          fi
+          printf 'window.LEXCLOUD_CONFIG = { apiBaseUrl: "%s" };\n' "${LEXCLOUD_API_BASE_URL}" > frontend/js/config.js
   artifacts:
     baseDirectory: frontend
     files:

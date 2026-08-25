@@ -30,3 +30,16 @@ Open `frontend/index.html` after copying `frontend/js/config.example.js` to `fro
 ## Deploy
 
 Infrastructure is defined in `template.yaml` (SAM transform) and deployed with AWS CLI in `ap-south-1`. The Groq API key is a stack parameter and is never committed.
+
+After a stack create, attach the S3 upload trigger (CloudFormation cannot do this in the same stack as the API without a circular dependency):
+
+```
+aws lambda add-permission --function-name LexCloudProcessor --principal s3.amazonaws.com --statement-id AllowLexCloudS3Invoke --action lambda:InvokeFunction --source-arn arn:aws:s3:::lexcloud-uploads-ACCOUNT --source-account ACCOUNT --region ap-south-1
+aws s3api put-bucket-notification-configuration --bucket lexcloud-uploads-ACCOUNT --notification-configuration file://s3-notify.json --region ap-south-1
+```
+
+Amplify Hosting builds `frontend/` and writes `js/config.js` from `LEXCLOUD_API_BASE_URL`.
+
+Current API base URL: `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod`
+
+If Amazon Textract or Amazon Translate are not subscribed on the account, the processor falls back to pypdf and Groq translation so the demo still runs. Enable those services in the AWS console to use the native APIs.
