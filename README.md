@@ -1,10 +1,16 @@
+<!-- Upper section: hero -->
 <div align="center">
+<img src="docs/banner.jpg" alt="LexCloud — Indian Law Advisor" width="100%">
+</div>
 
-<img src="docs/logo.png" alt="LexCloud" width="180">
+---
 
-# LexCloud
+<div align="center">
+<img src="docs/logo.png" alt="LexCloud logo" width="128">
 
-### AI-Powered Legal Advisor for Indian Law
+<p><b>LexCloud</b></p>
+
+<p>AI-Powered Legal Advisor for Indian Law</p>
 
 A serverless counsel that **uploads legal PDFs**, **answers from the document (RAG)**, **translates into Indian languages**, and supports **voice in (Whisper)** and **voice out (Amazon Polly)** — hosted on AWS Amplify.
 
@@ -17,13 +23,10 @@ A serverless counsel that **uploads legal PDFs**, **answers from the document (R
 [![Groq](https://img.shields.io/badge/Groq-GPT--OSS%20%2B%20Whisper-f55036?style=for-the-badge)](https://groq.com/)
 [![Polly](https://img.shields.io/badge/Polly-Aditi-4B72B0?style=for-the-badge)](https://aws.amazon.com/polly/)
 [![License](https://img.shields.io/badge/License-MIT-7c6cff?style=for-the-badge)](LICENSE)
-[![Watch demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20demo-Loom-625df5?style=for-the-badge&logo=loom&logoColor=white)](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a)
 
 **Theme** · Ink (`#0b1210`) · Brass (`#d4af6a`) · Parchment (`#f3ead6`) · Editorial legal UI
 
-**Live app** · [https://main.d2pw2pic3w5m1.amplifyapp.com](https://main.d2pw2pic3w5m1.amplifyapp.com)
-
-**API** · `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod`
+[Live app](https://main.d2pw2pic3w5m1.amplifyapp.com) · API `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod`
 
 **Built by [Mohammed Rashique Shuraim](https://github.com/MohammedShuraim)**
 
@@ -33,17 +36,13 @@ A serverless counsel that **uploads legal PDFs**, **answers from the document (R
 
 <div align="center">
 
-## See it with your own eyes
+### See it with your own eyes
 
-<a href="https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a">
-  <img src="https://cdn.loom.com/sessions/thumbnails/ed575fdabd3142d5bef7168b4414385a-with-play.gif" alt="Watch the LexCloud product demo on Loom" width="720">
-</a>
-
-### [▶ Watch the LexCloud demo on Loom](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a)
+▶️ **[Watch the LexCloud demo on Loom](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a)**
 
 Upload a legal PDF · Ask with RAG · Translate the full document · Record a question · Hear Polly read the answer
 
-GitHub cannot play video inside a README. Click the preview — it opens the recording so anyone can watch it without requesting access.
+GitHub cannot play video inside a README — click the link to watch the walkthrough.
 
 </div>
 
@@ -52,6 +51,8 @@ GitHub cannot play video inside a README. Click the preview — it opens the rec
 ## Project Overview
 
 **LexCloud** is a cloud-native legal desk for Indian contracts and statutes. Upload a PDF once, then **ask (RAG)** or **translate** it. **Chat** never reads a document.
+
+The product is one counsel — not a pile of Lambdas taped together. Presigned upload, extract, retrieve, translate, Whisper, and Polly all share the same document record.
 
 | Capability | What it does |
 |---|---|
@@ -62,7 +63,7 @@ GitHub cannot play video inside a README. Click the preview — it opens the rec
 | **Voice out** | Amazon Polly (Aditi) reads the last answer |
 | **Hosting** | Static UI on AWS Amplify, API on API Gateway + Lambda |
 
-The product loop is one path:
+The product journey is designed as one loop:
 
 **Upload or speak → Extract or transcribe → Retrieve / translate / chat → Format the opinion → Optional Polly playback.**
 
@@ -71,24 +72,61 @@ The product loop is one path:
 ## Architecture
 
 ```mermaid
-flowchart LR
-  user[Browser] --> amp[AmplifyHosting]
-  amp --> apigw[APIGateway]
-  apigw --> uploader[UploaderLambda]
-  apigw --> statusFn[StatusLambda]
-  apigw --> aiFn[AiLambda]
-  apigw --> ttsFn[TtsLambda]
-  apigw --> whisperFn[WhisperLambda]
-  uploader --> s3[S3Uploads]
-  s3 --> processor[ProcessorLambda]
-  processor --> textract[Textract]
-  processor --> pypdf[pypdfFallback]
-  processor --> ddb[DynamoDB]
-  aiFn --> ddb
-  aiFn --> translate[AmazonTranslate]
-  aiFn --> groqChat[GroqGptOss]
-  ttsFn --> polly[PollyAditi]
-  whisperFn --> groqWhisper[GroqWhisper]
+flowchart TB
+  subgraph Client["Front end"]
+    WEB["Amplify static UI<br/>RAG · Translate · Chat"]
+  end
+
+  subgraph API["Amazon API Gateway REST"]
+    UP["POST /upload"]
+    DOC["GET /document"]
+    Q["POST /query"]
+    TTS["POST /tts"]
+    TR["POST /transcribe"]
+  end
+
+  subgraph Compute["Lambda · Python 3.12"]
+    UPLOADER["Uploader<br/>presigned S3 PUT"]
+    PROC["Processor<br/>Textract or pypdf"]
+    STATUS["Status<br/>document ready"]
+    AI["AI<br/>RAG · chat · translate"]
+    POLLYFN["TTS<br/>Polly Aditi"]
+    WHISPER["Transcriber<br/>Groq Whisper"]
+  end
+
+  subgraph Data["Storage"]
+    S3["S3 uploads/"]
+    DDB["DynamoDB LexCloudDocuments"]
+  end
+
+  subgraph Cloud["Models and AWS extras"]
+    GROQ["Groq gpt-oss-20b"]
+    WH["whisper-large-v3-turbo"]
+    TX["Textract · optional"]
+    AT["Amazon Translate · optional"]
+    PO["Polly Aditi"]
+  end
+
+  WEB --> UP
+  WEB --> DOC
+  WEB --> Q
+  WEB --> TTS
+  WEB --> TR
+  UP --> UPLOADER
+  DOC --> STATUS
+  Q --> AI
+  TTS --> POLLYFN
+  TR --> WHISPER
+  UPLOADER --> S3
+  S3 --> PROC
+  PROC --> TX
+  PROC --> DDB
+  STATUS --> DDB
+  AI --> DDB
+  AI --> AT
+  AI --> GROQ
+  POLLYFN --> PO
+  WHISPER --> WH
 ```
 
 **Upload path**
@@ -102,6 +140,24 @@ flowchart LR
 **Voice path**
 
 `Record → Stop → POST /transcribe (Whisper) → textarea → Ask → POST /tts (Polly MP3)`
+
+pypdf and Groq cover extract and translate when Textract or Amazon Translate are not subscribed on the account.
+
+---
+
+## UI Showcase
+
+> Visual language: ink (`#0b1210`), brass (`#d4af6a`), parchment (`#f3ead6`), Newsreader headings, Outfit UI, dashed dropzone, live waveform.
+
+| Surface | Preview |
+|---|---|
+| **Live Amplify desk** | ![Live Amplify desk](docs/screenshots/amplify.jpg) |
+| **RAG** | ![RAG](docs/screenshots/rag.jpg) |
+| **Translate** | ![Translate](docs/screenshots/translate.jpg) |
+| **Chat** | ![Chat](docs/screenshots/chat.jpg) |
+| **Voice recorder** | ![Voice recorder](docs/screenshots/recorder.jpg) |
+
+Open the [live app](https://main.d2pw2pic3w5m1.amplifyapp.com) to click through the same surfaces.
 
 ---
 
@@ -123,6 +179,10 @@ flowchart TD
   K --> L{Listen?}
   L -->|yes| M[Amazon Polly Aditi]
 ```
+
+On the web UI, **Stop** is the intent for voice — Whisper fills the box as soon as you stop. After you ask:
+
+**Retrieving → Drafting → Reveal the opinion → Optional Listen**
 
 ---
 
@@ -177,19 +237,6 @@ flowchart TD
 
 ---
 
-## Live Demo
-
-| Surface | URL |
-|---|---|
-| **Product video** | [Watch on Loom](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a) |
-| Web app | [https://main.d2pw2pic3w5m1.amplifyapp.com](https://main.d2pw2pic3w5m1.amplifyapp.com) |
-| API base | `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod` |
-| GitHub | [MohammedShuraim/LexCloud](https://github.com/MohammedShuraim/LexCloud) |
-
-Try: upload a lease in **RAG** → ask who the parties are → switch to **Translate** and upload (or a different PDF) → **Chat** for general Indian-law questions → **Record** / **Stop** / **Listen**.
-
----
-
 ## Setup Instructions
 
 ### Prerequisites
@@ -197,6 +244,7 @@ Try: upload a lease in **RAG** → ask who the parties are → switch to **Trans
 - AWS CLI signed in (this stack uses `ap-south-1`)
 - A Groq key from [console.groq.com/keys](https://console.groq.com/keys)
 - Node is **not** required — the UI is static
+- Chrome for local microphone tests *(or use the Amplify HTTPS URL)*
 
 ### 1. Clone
 
@@ -212,6 +260,12 @@ copy frontend\js\config.example.js frontend\js\config.js
 ```
 
 Set `apiBaseUrl` to the deployed API (or your own stack output `ApiBaseUrl`). Open `frontend/index.html` in Chrome.
+
+| Surface | URL |
+|---|---|
+| Live Amplify app | https://main.d2pw2pic3w5m1.amplifyapp.com |
+| API base | `https://pvkvjvq3pj.execute-api.ap-south-1.amazonaws.com/prod` |
+| Product video | [Loom walkthrough](https://www.loom.com/share/ed575fdabd3142d5bef7168b4414385a) |
 
 ### 3. Deploy infrastructure
 
@@ -259,8 +313,11 @@ LexCloud/
 │   ├── tts/                   # Polly Aditi
 │   └── transcriber/           # Groq Whisper
 ├── docs/
-│   ├── banner.svg
-│   └── screenshots/
+│   ├── banner.jpg             # Lady Justice README hero
+│   ├── logo.png               # Brand mark
+│   └── screenshots/           # Product captures for this README
+├── scripts/
+│   └── capture_readme_shots.py
 ├── template.yaml              # SAM / CloudFormation
 ├── amplify.yml
 ├── LICENSE
@@ -269,7 +326,40 @@ LexCloud/
 
 ---
 
+## Environment Variables
+
+The Groq key is a CloudFormation parameter (`GroqApiKey`, `NoEcho`). The browser only needs the API base URL.
+
+### Amplify
+
+| Variable | Description |
+|---|---|
+| `LEXCLOUD_API_BASE_URL` | Stack output `ApiBaseUrl` — written into `frontend/js/config.js` at build time |
+
+### Local frontend
+
+Template: [`frontend/js/config.example.js`](frontend/js/config.example.js) · real values go in **`frontend/js/config.js`** (gitignored).
+
+| Key | Description |
+|---|---|
+| `apiBaseUrl` | Deployed API Gateway `/prod` URL |
+
+### Lambda (set by the stack)
+
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | From `GroqApiKey` — chat, Groq translate fallback, Whisper |
+| `GROQ_MODEL` | `openai/gpt-oss-20b` |
+| `DYNAMODB_TABLE_NAME` | `LexCloudDocuments` |
+| `DOCUMENT_BUCKET` | Uploads bucket |
+
+> **Never commit real keys.** If a key lands in git, rotate it in the Groq console — deleting the file is not enough.
+
+---
+
 ## API Surface
+
+Built for the Amplify client. Binary media types are enabled for Whisper uploads. API Gateway still caps bodies at **10 MB**.
 
 | Method | Path | Role |
 |---|---|---|
@@ -279,32 +369,7 @@ LexCloud/
 | `POST` | `/tts` | `{ text }` → `{ audioBase64 }` |
 | `POST` | `/transcribe` | multipart `file` → `{ transcription }` |
 
-CORS is open for the Amplify origin. Binary media types are enabled for Whisper uploads. API Gateway still caps bodies at **10 MB**.
-
----
-
-## Screenshots
-
-Place product captures here so the gallery lights up on GitHub:
-
-```text
-docs/screenshots/
-├── rag.png
-├── translate.png
-├── chat.png
-├── recorder.png
-└── amplify.png
-```
-
-| Screen | File |
-|---|---|
-| RAG | `docs/screenshots/rag.png` |
-| Translate | `docs/screenshots/translate.png` |
-| Chat | `docs/screenshots/chat.png` |
-| Recorder | `docs/screenshots/recorder.png` |
-| Amplify | `docs/screenshots/amplify.png` |
-
-Until those files exist, use the [live app](https://main.d2pw2pic3w5m1.amplifyapp.com).
+CORS is open for the Amplify origin.
 
 ---
 
