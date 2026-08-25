@@ -1,3 +1,4 @@
+import io
 import os
 import time
 import traceback
@@ -5,9 +6,12 @@ from datetime import datetime, timezone
 from urllib.parse import unquote_plus
 
 import boto3
+from botocore.exceptions import ClientError
+from pypdf import PdfReader
 
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "LexCloudDocuments")
 
+s3 = boto3.client("s3")
 textract = boto3.client("textract")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
@@ -50,13 +54,14 @@ def collect_lines(job_id):
     return "\n".join(lines)
 
 
-def extract_text(bucket, key):
+def extract_with_textract(bucket, key):
     started = textract.start_document_text_detection(
         DocumentLocation={"S3Object": {"Bucket": bucket, "Name": key}}
     )
     job_id = started["JobId"]
     deadline = time.time() + MAX_WAIT
     status = "IN_PROGRESS"
+    desc = {}
     while time.time() < deadline:
         desc = textract.get_document_text_detection(JobId=job_id, MaxResults=1)
         status = desc.get("JobStatus")
@@ -71,6 +76,29 @@ def extract_text(bucket, key):
     return collect_lines(job_id)
 
 
+def extract_with_pypdf(bucket, key):
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    reader = PdfReader(io.BytesIO(obj["Body"].read()))
+    pages = [(page.extract_text() or "") for page in reader.pages]
+    return "\n".join(pages).strip()
+
+
+def extract_text(bucket, key):
+    try:
+        return extract_with_textract(bucket, key), "textract"
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        print(f"Textract unavailable ({code}); falling back to pypdf")
+        if code in {
+            "SubscriptionRequiredException",
+            "AccessDeniedException",
+            "UnrecognizedClientException",
+            "InvalidSignatureException",
+        }:
+            return extract_with_pypdf(bucket, key), "pypdf"
+        raise
+
+
 def lambda_handler(event, context):
     try:
         record = event["Records"][0]
@@ -80,9 +108,9 @@ def lambda_handler(event, context):
             print(f"skip key {key}")
             return {"skipped": key}
         put_status(key, "PROCESSING", bucket=bucket)
-        text = extract_text(bucket, key)
+        text, engine = extract_text(bucket, key)
         if not text.strip():
-            put_status(key, "FAILED", error="Textract returned no text", bucket=bucket)
+            put_status(key, "FAILED", error="No text could be extracted", bucket=bucket, engine=engine)
             return {"status": "FAILED", "document_name": key}
         put_status(
             key,
@@ -90,16 +118,16 @@ def lambda_handler(event, context):
             bucket=bucket,
             originalText=text,
             charCount=len(text),
+            engine=engine,
         )
-        print(f"processed {key} chars={len(text)}")
-        return {"status": "READY", "document_name": key, "charCount": len(text)}
+        print(f"processed {key} chars={len(text)} engine={engine}")
+        return {"status": "READY", "document_name": key, "charCount": len(text), "engine": engine}
     except Exception as exc:
-        tb = traceback.format_exc()
-        print(tb)
+        print(traceback.format_exc())
         try:
             record = event["Records"][0]
             key = unquote_plus(record["s3"]["object"]["key"])
             put_status(key, "FAILED", error=str(exc)[:500])
         except Exception:
             pass
-        raise
+        return {"status": "FAILED", "error": str(exc)}
