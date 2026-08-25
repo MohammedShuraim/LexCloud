@@ -12,6 +12,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_API_URL = os.environ.get(
     "GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions"
 )
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
 MAX_PROMPT_CHARS = int(os.environ.get("MAX_PROMPT_CHARS", "4500"))
 
 dynamodb = boto3.resource("dynamodb")
@@ -102,7 +103,7 @@ def call_groq(user_content):
     if not GROQ_API_KEY or GROQ_API_KEY == "changeme":
         raise ValueError("GROQ_API_KEY is not configured")
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": GROQ_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content},

@@ -6,7 +6,6 @@ Parameters:
   GroqApiKey:
     Type: String
     NoEcho: true
-    Default: changeme
     Description: Groq API key for Llama chat/RAG and Whisper transcription
 
 Globals:
@@ -173,6 +172,7 @@ Resources:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref DocumentsTable
           GROQ_API_KEY: !Ref GroqApiKey
+          GROQ_MODEL: openai/gpt-oss-20b
       Events:
         QueryApi:
           Type: Api
