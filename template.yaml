@@ -99,6 +99,63 @@ Resources:
             Path: /upload
             Method: POST
 
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LexCloudProcessor
+      Handler: app.lambda_handler
+      CodeUri: lambdas/processor/
+      Timeout: 300
+      MemorySize: 512
+      Description: Textract PDFs on S3 upload and store text in DynamoDB
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref UploadsBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DocumentsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - textract:StartDocumentTextDetection
+                - textract:GetDocumentTextDetection
+              Resource: "*"
+      Environment:
+        Variables:
+          DOCUMENT_BUCKET: !Ref UploadsBucket
+          DYNAMODB_TABLE_NAME: !Ref DocumentsTable
+      Events:
+        PdfCreated:
+          Type: S3
+          Properties:
+            Bucket: !Ref UploadsBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: uploads/
+
+  StatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LexCloudStatus
+      Handler: app.lambda_handler
+      CodeUri: lambdas/status/
+      Description: Poll whether Textract has stored document text
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DocumentsTable
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref DocumentsTable
+      Events:
+        StatusApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref LexCloudApi
+            Path: /document
+            Method: GET
+
 Outputs:
   UploadsBucketName:
     Description: S3 bucket for presigned PDF uploads
