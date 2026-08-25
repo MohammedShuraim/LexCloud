@@ -11,6 +11,7 @@ packaged-template.yaml
 samconfig.toml
 *.zip
 lambda-artifacts/
+sample-lease.pdf
 
 # Python
 __pycache__/

@@ -4,9 +4,16 @@ import re
 import uuid
 
 import boto3
+from botocore.config import Config
 
 BUCKET = os.environ.get("DOCUMENT_BUCKET", "")
-s3 = boto3.client("s3")
+REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "ap-south-1"
+s3 = boto3.client(
+    "s3",
+    region_name=REGION,
+    endpoint_url=f"https://s3.{REGION}.amazonaws.com",
+    config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+)
 
 
 def respond(status, body):
