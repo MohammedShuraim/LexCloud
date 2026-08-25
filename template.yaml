@@ -115,11 +115,13 @@ Resources:
       MemorySize: 512
       Description: Textract PDFs on S3 upload and store text in DynamoDB
       Policies:
-        - S3ReadPolicy:
-            BucketName: !Ref UploadsBucket
         - DynamoDBCrudPolicy:
             TableName: !Ref DocumentsTable
         - Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::lexcloud-uploads-${AWS::AccountId}/*"
             - Effect: Allow
               Action:
                 - textract:StartDocumentTextDetection
@@ -127,7 +129,6 @@ Resources:
               Resource: "*"
       Environment:
         Variables:
-          DOCUMENT_BUCKET: !Ref UploadsBucket
           DYNAMODB_TABLE_NAME: !Ref DocumentsTable
       Events:
         PdfCreated:
